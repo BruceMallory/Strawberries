@@ -75,7 +75,7 @@ colnames(straw)
 ```
 
 ## (5) From the "Domain" column filter out unecessary records
-### In "Domain" colunn there are the followng unique enteries:
+### In "Domain" colunn these are the unique enteries:
 ```{r echo=FALSE}
 straw$'Domain' %>% unique
 ```
@@ -84,7 +84,18 @@ straw$'Domain' %>% unique
  d_total <- filter(straw, Domain=="TOTAL")
 d_total$`Data Item` %>% unique()
 d_total$`Domain Category` %>% unique()
+```
+### None of these enteries refered to chemical applications.  So I was comfortable removing those records.  This brought the data.frame down from 3220 rows to 2862 rows
+```{r echo=FALSE}
+straw <- filter(straw, Domain!="TOTAL")
+```
+## (6) Filter useful records from the "Data Items" column
+
+### In this column there were 5 unique enteries
+```{r echo=FALSE}
+straw$'Data Item' %>% unique
+```
+### I made a table to see which of these categories had the most information for me to use.  This is the table:
+```{r echo=FALSE}
 
 ```
-### None of these enteries refered to chemical applications.  So I was comfortable removing those records.  This brought the data.frame down from 3220 rows to # rows
-
