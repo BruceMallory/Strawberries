@@ -1,7 +1,7 @@
 ---
 title: "Strawberries"
 author: "Bruce Mallory"
-date: "10/13/2020"
+date: "10/19/2020"
 output: pdf_document
 ---
 
@@ -15,6 +15,12 @@ opts_chunk$set(echo = FALSE,
                warning = FALSE,
                message = FALSE)
 ```
+# My Goal
+My overall goal is to create a data.frame that will allow me to look at the type of chemical application (fungicide, herbicide, insecticide, or fertilizer) and examine per acre applications in selected states during selected years.
+
+![my target data.frame organization](goal.png)
+
+# MY STEPS
 
 ##  (1) Read and examine
 
@@ -58,7 +64,7 @@ colnames(ag_data)
 ```
 
 ## (4) Select the rows that contain "Strawberries" & only the rows where the 'Period' = "YEAR".  Then eliminate the Period and Commodity column.
-NOTE: The Period column has three values: "MARKETING YEAR", "YEAR", and "YEAR - AUG FORECAST."  We are only keeping the records where Period = "YEAR" so that we have a consistent comparison.
+NOTE: The Period column has three values: "MARKETING YEAR", "YEAR", and "YEAR - AUG FORECAST."  I am only keeping the records where Period = "YEAR" so that we have a consistent comparison.
 
 This leaves 6 columns.
 ```{r echo=FALSE}
@@ -68,5 +74,17 @@ straw %<>% select(-c(Period, Commodity))
 colnames(straw)
 ```
 
-## (5)
+## (5) From the "Domain" column filter out unecessary records
+### In "Domain" colunn there are the followng unique enteries:
+```{r echo=FALSE}
+straw$'Domain' %>% unique
+```
+### Before filtering out all the records where Domain=="TOTAL" I checked to see what information was in those records in the "Data Item" column and in the "Domain Category" column.
+```{r}
+ d_total <- filter(straw, Domain=="TOTAL")
+d_total$`Data Item` %>% unique()
+d_total$`Domain Category` %>% unique()
+
+```
+### None of these enteries refered to chemical applications.  So I was comfortable removing those records.  This brought the data.frame down from 3220 rows to # rows
 
