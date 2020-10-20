@@ -1,0 +1,148 @@
+---
+title: "Strawberries"
+author: "Bruce Mallory"
+date: "10/20/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+library(knitr)
+library(tidyverse)
+library(magrittr)
+library(kableExtra)
+library(dplyr)
+
+opts_chunk$set(echo = FALSE, 
+               warning = FALSE,
+               message = FALSE)
+```
+# My GOAL
+My overall goal is to create a data.frame that will allow me to look at the type of chemical application (fungicide, herbicide, insecticide, or fertilizer) and examine per acre applications in selected states during selected years.
+
+![my target data.frame organization](goal.png)
+
+# MY STEPS
+
+##  (1) Read and examine
+These data were collected from the USDA database selector: <a href="https://quickstats.nass.usda.gov">https://quickstats.nass.usda.gov</a>
+
+The data were <a href="https://quickstats.nass.usda.gov/results/D416E96E-3D5C-324C-9334-1D38DF88FFF1">stored online</a> and then downloaded to a CSV file.
+
+The data has 21 columns.
+
+```{r echo=FALSE}
+ag_data <- read_csv("berries.csv", col_names = TRUE)
+
+colnames(ag_data)
+```
+
+## (2) Remove NA columns
+After removing all the columns that only had NAs in them, I had these 12 columns.
+```{r echo=FALSE}
+
+NA_cols <- which(sapply(ag_data, function(x)all(is.na(x))))
+
+ag_data %<>% select(-all_of(NA_cols))
+
+colnames(ag_data)
+```
+
+## (3) Remove the columns that provide no new information
+"Program" and "Geo Level" have only 1 value.  And "State ANSI" adds no new information to "State"
+
+This leaves 8 columns.
+```{r echo=FALSE}
+
+uni_cols <- sapply(ag_data,function(x) length(unique(x)))
+ag_data %<>% subset(select=uni_cols>1)
+#note - I could have done this at the beginning to also get rid of the NAs and 
+#skipped the previous chunk of r code.  But I wanted to play with removing NAs.
+
+ag_data %<>% select(-`State ANSI`) 
+
+colnames(ag_data)
+```
+
+## (4) Filter for 'Strawberries' and 'Year'
+NOTE: The Period column has three values: 'MARKETING YEAR', 'YEAR', and 'YEAR - AUG FORECAST.'  I am only keeping the records where Period = 'YEAR' so that we have a consistent comparison.  After filtering, I removed the "Period" and "Commodity" columns.
+
+This leaves 6 columns.
+```{r echo=FALSE}
+straw <- ag_data %>% filter((Commodity=="STRAWBERRIES") & (Period=="YEAR"))
+straw %<>% select(-c(Period, Commodity))
+
+colnames(straw)
+```
+
+## (5) In the "Domain" column filter out the unecessary records
+In the "Domain" column these are the unique entries:
+```{r echo=FALSE}
+straw$'Domain' %>% unique
+```
+Before filtering out all the records where Domain=='TOTAL' I checked to see what information was in those records in the "Data Item" column and in the "Domain Category" column.
+```{r}
+d_total <- filter(straw, Domain=="TOTAL")
+d_total$`Data Item` %>% unique()
+d_total$`Domain Category` %>% unique()
+```
+## (6) From the "Data Items" column filter the useful records
+In this column there were 5 unique entries
+```{r echo=FALSE}
+straw$'Data Item' %>% unique
+```
+I made a table to see which of these categories had the most information for me to use.  This is the table:
+```{r echo=FALSE}
+what <- data.frame(table(straw$'Data Item'))
+kable(head(what, n=5)) %>% kable_styling(font_size=8)
+```
+Since the frequencies were almost identical, I decided to use the one that made the most sense to me: "LB/ACRE/YEAR on average."  I then filtered in these rows and deleted the "Data Item" column, and renamed the "Value" column to be "Avg lb/acre/yr."  This is the head of the data.frame so far:
+```{r echo=FALSE}
+straw %<>% filter(straw$'Data Item'=="STRAWBERRIES, BEARING - APPLICATIONS, MEASURED IN LB / ACRE / YEAR, AVG") %<>%
+  select(-('Data Item')) 
+colnames(straw)[5] <-"Avg lb/acre/yr"
+# I tried colnames(straw)$'Data Item' and other variations, but I couldn't get the code to
+# be more general that specifically renaming column 5.  Is there a way?
+kable(head(straw, n=5)) %>% kable_styling(font_size=10) %>% column_spec(4, width="15em")
+```
+### (7) Create an "Application" column.
+To do this I first separated the "Domain" column and kept just the back end of each of the entries.  I relabeled this column "Application."  This gave me the following unique entries in the "Application" column:
+```{r echo=FALSE}
+straw %<>% separate(Domain, c("D_left", "D_right"), sep = ", ") %>% 
+  select(-('D_left'))
+colnames(straw)[3] <-"Application"
+straw$'Application' %>% unique
+
+```
+Then I needed to see if all of the NAs in the "Application" column were when a 'FERTILIZER' was used.  To do this I wrote a loop that checked each row to see if, when the entry in "Application" was = NA the "Domain Category" contained 'FERTILIZER.'  There were 15 instances, so I concluded that I could replace the NAs in the "Application" column with "FERTILIZER" and delete the "Domain Category" column.
+```{r echo=TRUE}
+n<-length(straw$Application)
+x<-0
+for (i in (1:n)) {
+  if((straw$Application[i]=="NA")|(is.na(straw$Application[i])) & (str_detect(straw$`Domain Category`[i], "FERTILIZER"))) {
+    x<-x+1
+  }
+}
+
+print(x)
+```
+
+```{r echo=FALSE}
+straw %<>% select(-("Domain Category")) 
+straw$Application <- factor(straw$Application)
+#revalue(straw$Application, c("FUNGICIDE"="Fungicide", "HERBICIDE"="Herbicide",
+#                             "INSECTICIDE"="Insecticide", "OTHER"="Fertilizer"))
+#This was my first attempt, but I couldn't figure out how to get it to NOT print out
+#all 560 straw$Application entries when it ran.  So I did the following:
+
+levels(straw$Application)[levels(straw$Application)=="OTHER"]<-"FERTILIZER"
+```
+Finally, I filtered out the records where "Application" contained 'OTHER,' and where "Avg lb/acre/yr" contained (NA) or (D).  This got me down to 225 records. 
+```{r echo=FALSE}
+straw %<>%  filter(Application != "OTHER")
+straw %<>% filter(straw$"Avg lb/acre/yr" != "(D)")
+straw %<>% filter(straw$"Avg lb/acre/yr" != "(NA)")
+```
+# MY FINAL PRODUCT (n=225): 
+```{r echo=FALSE}
+kable(head(straw, n=5)) %>% kable_styling(font_size=12)
+```
